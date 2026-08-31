@@ -1,0 +1,31 @@
+# Night Slashers — ARM main CPU (Amber 'amber23' core, patched for DECO 156)
+#
+# amber23 ARMv2a / 26-bit core from OpenCores (Conor Santifort, LGPL),
+# patched for arcade use: synchronous i_reset added, CP15 coprocessor
+# removed, L1 cache held disabled. Wrapped by arm_cpu_wrapper.sv which
+# bridges the Wishbone master to the Night Slashers arcade bus.
+#
+# Include files (a23_localparams.v / a23_functions.v / a23_config_defines.v /
+# memory_configuration.v / global_defines.v / debug_functions.v) are pulled in
+# via `include from the module files, so the search path must contain this dir.
+
+set_global_assignment -name SEARCH_PATH "$::quartus(qip_path)"
+
+# --- Wrapper (top of this block) ---
+set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) arm_cpu_wrapper.sv]
+
+# --- Amber23 core modules (synthesizable) ---
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) a23_core.v]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) a23_decode.v]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) a23_execute.v]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) a23_register_bank.v]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) a23_fetch.v]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) a23_alu.v]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) a23_barrel_shift_fpga.v]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) a23_multiply.v]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) a23_cache.v]
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) a23_wishbone.v]
+
+# --- DECO156 BCD coprocessor: ISTANZIATO per nslasher (il firmware lo USA, 2860
+#     istruzioni coproc; senza -> undefined 0x4 -> crash -> nero). Vedi a23_core.v. ---
+set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) a23_copro_deco156.v]

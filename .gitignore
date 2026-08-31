@@ -1,0 +1,32 @@
+# Quartus build artifacts
+output_files/
+db/
+incremental_db/
+simulation/
+timing/
+greybox_tmp/
+hc_output/
+*.qws
+*.rpt
+*.summary
+*.smsg
+*.done
+*.pin
+*.jdi
+*.sld
+*.bak
+*.orig
+c5_pin_model_dump.txt
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*~
+
+# tool output
+out/
+sim_out/
+__pycache__/
+hps_isw_handoff/
+.qsys_edit/
+*.qar
