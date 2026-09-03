@@ -315,14 +315,19 @@ module crt_adjust_sys #(
     // (~bank), quindi e` in ritardo di 1 riga rispetto al write/vb_in nativo.
     // Se vb_active seguisse vb_in al write rate, spegnerebbe pass_q mentre il
     // read sta ancora emettendo l'ultima riga attiva -> ultima riga mangiata.
-    // Campiono vb_in una volta per riga (hs_rise) e lo ritardo di 1 riga cosi`
+    // Campiono vb_in una volta per riga (hs_rise) e lo ritardo di UNA riga, cosi`
     // vb_active si allinea a cio` che il read sta effettivamente emettendo.
-    reg vb_line, vb_active;
-    initial begin vb_line = 0; vb_active = 0; end
-    always @(posedge clk) if (hs_rise_in) begin
-        vb_line   <= vb_in;
-        vb_active <= vb_line;
-    end
+    //
+    // 2026-09-01: erano DUE registri in cascata = due righe di ritardo contro
+    // una sola di latenza del read side -> pass_q si accendeva una riga tardi e
+    // la PRIMA riga attiva veniva mangiata con CRT Adjust acceso. Misurato sul
+    // banco Verilator (CRTAdjust_Visual, catena vera) sul raster 442x269 di NS:
+    // bypass 240 righe [20..259], acceso 239 [21..259]. Con un solo registro
+    // torna 240 [20..259], identico al bypass; provato su 162 combinazioni di
+    // V-Size / modo / H-Size / H-Position / V-Shift, mai una riga in meno.
+    reg vb_active;
+    initial vb_active = 0;
+    always @(posedge clk) if (hs_rise_in) vb_active <= vb_in;
 
     // hoffset (signed) sposta la finestra attiva: >0 = contenuto a DESTRA, <0 a
     // SINISTRA. rd_addr compensa per leggere il pixel sorgente giusto. hs_out NON

@@ -120,6 +120,33 @@ module crt_vsize #(
     wire vs_rise = pxl_cen & vs_in & ~vs_d;
     wire de_rise = pxl_cen & de_in & ~de_d;
 
+    // ------------------------------------------------------------------
+    //  CAMPO ATTIVO MISURATO (2026-09-02)
+    //  Il vb esterno puo' non essere allineato all'immagine: su Night Slashers
+    //  arriva una riga DOPO i pixel veri (misurato sul segnale: DE sulle righe
+    //  25..264, vb_in dichiara 26..265). Fidarsi di quel segnale faceva
+    //  cambiare la finestra verticale passando da bypass (vb esterno) a attivo
+    //  (finestra autogenerata): una riga di salto, visibile al primo scatto.
+    //  Qui il campo attivo si MISURA dal de_in del quadro precedente, come si
+    //  fa gia' per il periodo di quadro: nessuna dipendenza da segnali esterni.
+    reg [9:0] ln_cnt;          // riga corrente nel quadro (0 al VSync)
+    reg [9:0] act_first_m, act_last_m;   // misura in corso
+    reg [9:0] act_first,   act_last;     // valori del quadro precedente
+    reg       act_seen;
+    initial begin ln_cnt=0; act_first_m=0; act_last_m=0; act_first=0; act_last=10'h3FF; act_seen=0; end
+    always @(posedge clk) begin
+        if (vs_rise) begin
+            if (act_seen) begin act_first <= act_first_m; act_last <= act_last_m; end
+            ln_cnt <= 0; act_seen <= 0; act_first_m <= 0; act_last_m <= 0;
+        end else if (hs_rise) ln_cnt <= ln_cnt + 10'd1;
+        if (de_rise) begin
+            if (!act_seen) begin act_first_m <= ln_cnt; act_seen <= 1; end
+            act_last_m <= ln_cnt;
+        end
+    end
+    // finestra verticale ricavata dall'immagine, usata al posto del vb esterno
+    wire vb_meas = ~((ln_cnt >= act_first) && (ln_cnt <= act_last));
+
     // ==================================================================
     //  MEASUREMENT (always running)
     // ==================================================================
@@ -456,6 +483,13 @@ module crt_vsize #(
     wire [5:0] rl_next = (rl == RING_LINES-1) ? 6'd0 : rl + 1'd1;
 
     // line tick: first at output-frame start, then every f_lat/lines_out clk
+    // Righe tolte al quadro dalla compressione (o dal vincolo LINE_CLK): vanno
+    // saltate in TESTA, dove c'e' il blanking. Leggendo dallo stesso punto di
+    // partenza il quadro finiva prima e la coda dell'immagine restava fuori:
+    // misurato sul flusso vero di Night Slashers, 238 righe invece di 240 da -4.
+    wire [9:0]  lines_cut  = (lines_nat > lines_out) ? (lines_nat - lines_out) : 10'd0;
+    wire [6:0]  slot_sum   = {1'b0, frame0_slot} + lines_cut[5:0];
+    wire [5:0]  frame_slot = (slot_sum >= RING_LINES) ? (slot_sum - RING_LINES) : slot_sum[5:0];
     wire        frame_go  = (start_cnt == START_LINES) && hs_rise && engine_on;
     wire [22:0] bres_sum  = {1'b0, bres_acc} + {13'd0, lines_out};
     wire        line_tick = out_running && (bres_sum >= {1'b0, f_lat});
@@ -468,7 +502,7 @@ module crt_vsize #(
             out_running <= 1;
             bres_acc    <= 0;
             out_line    <= 0;
-            rl          <= frame0_slot;
+            rl          <= frame_slot;   // salta in testa le righe tolte
         end else if (out_running) begin
             bres_acc <= line_tick ? (bres_sum - {1'b0, f_lat}) : bres_sum[21:0];
             if (line_tick) begin
@@ -529,7 +563,7 @@ module crt_vsize #(
             o_cline      <= 22'd1;
             o_px         <= 0;
             o_ce_cnt     <= 0;
-            o_pxcnt      <= meta_px[frame_go ? frame0_slot : rl_next];
+            o_pxcnt      <= meta_px[frame_go ? frame_slot : rl_next];
             o_vs         <= frame_go ? 1'b1 : (out_line + 1'd1 < {6'd0, vs_lines});
             win_q        <= 0;
         end else begin
@@ -758,7 +792,7 @@ module crt_vsize #(
     initial begin r_q=0; g_q=0; b_q=0; hs_q=0; vs_q=0; de_q=0; vb_q=1; end
     always @(posedge clk) if (pxl_cen) begin
         r_q <= r_in;  g_q <= g_in;  b_q <= b_in;
-        hs_q <= hs_in; vs_q <= vs_in; de_q <= de_in; vb_q <= vb_in;
+        hs_q <= hs_in; vs_q <= vs_in; de_q <= de_in; vb_q <= vb_meas;   // finestra MISURATA, non il vb esterno
     end
 
     initial begin

@@ -296,7 +296,7 @@ localparam CONF_STR = {
 	"P1O[91],CRT Adjust,Off,On;",
 	"H1P1O[90:86],CRT H-Size,0,+1,+2,+3,+4,+5,+6,+7,+8,+9,+10,+11,+12,+13,+14,+15,-16,-15,-14,-13,-12,-11,-10,-9,-8,-7,-6,-5,-4,-3,-2,-1;",
 	"H1P1O[29:23],CRT H-Position,0,+1,+2,+3,+4,+5,+6,+7,+8,+9,+10,+11,+12,+13,+14,+15,+16,+17,+18,+19,+20,+21,+22,+23,+24,+25,+26,+27,+28,+29,+30,+31,+32,+33,+34,+35,+36,+37,+38,+39,+40,+41,+42,+43,+44,+45,+46,+47,+48,-48,-47,-46,-45,-44,-43,-42,-41,-40,-39,-38,-37,-36,-35,-34,-33,-32,-31,-30,-29,-28,-27,-26,-25,-24,-23,-22,-21,-20,-19,-18,-17,-16,-15,-14,-13,-12,-11,-10,-9,-8,-7,-6,-5,-4,-3,-2,-1;",
-	"H1P1O[5:1],CRT V-Shift,0,+1,+2,+3,+4,+5,+6,+7,+8,+9,+10,+11,+12,+13,+14,+15,-16,-15,-14,-13,-12,-11,-10,-9,-8,-7,-6,-5,-4,-3,-2,-1;",
+	"H1P1O[6:1],CRT V-Shift,0,+1,+2,+3,+4,+5,+6,+7,+8,+9,+10,+11,+12,+13,+14,+15,+16,+17,+18,+19,+20,+21,+22,+23,+24,+25,+26,+27,+28,+29,+30,+31,-32,-31,-30,-29,-28,-27,-26,-25,-24,-23,-22,-21,-20,-19,-18,-17,-16,-15,-14,-13,-12,-11,-10,-9,-8,-7,-6,-5,-4,-3,-2,-1;",
 	"H1P1O[70:66],CRT V-Size,0,+1,+2,+3,+4,+5,+6,+7,+8,+9,+10,+11,+12,+13,+14,+15,-16,-15,-14,-13,-12,-11,-10,-9,-8,-7,-6,-5,-4,-3,-2,-1;",
 	"H1P1O[71],CRT V-Size Mode,PVM,Cabinet;",
 	// CPU Speed RI-ESPOSTA 2026-07-19.
@@ -1437,9 +1437,11 @@ wire signed [8:0] hpos_off = (hpos_d <= 7'd48)
 	? $signed({2'b0, hpos_d})
 	: $signed({2'b0, hpos_d}) - 9'sd97;
 
-// V-Shift (status[5:1], signed 5-bit -16..+15 righe).
+// V-Shift (status[6:1], signed 6-bit -32..+31 righe). Il bit 6 era libero.
+// Serve tutta questa corsa perche' lo shrink del V-Size ritira il bordo alto
+// (ancoraggio in basso, documentato nel modulo) e il ricentraggio si fa a mano.
 reg signed [5:0] vshift_off;
-always @(posedge clk_sys) if (ce_pix) vshift_off <= $signed(status[5:1]);
+always @(posedge clk_sys) if (ce_pix) vshift_off <= $signed(status[6:1]);
 
 // Il generatore del read-CE e' passato in sys_top (variante sys-side).
 

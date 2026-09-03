@@ -1398,6 +1398,27 @@ scanlines #(0) VGA_scanlines
 	.ce_out(vga_ce_sl)
 );
 
+// I valori che arrivano dall'emu vengono RIREGISTRATI qui, appena entrati.
+// Sono impostazioni dell'OSD: cambiano solo quando l'utente muove il cursore,
+// quindi un ciclo di ritardo non ha alcun effetto. Serve a spezzare il cammino
+// emu -> modulo: l'H-Position sceglie la presa su uno shift register lungo
+// quanto la riga, e sommare a quel mux anche la traversata del chip mandava il
+// path in negativo (misurato: -0.470 con i valori presi direttamente).
+reg              crt_on_r;
+reg signed [4:0] crt_hsize_r;
+reg signed [8:0] crt_hpos_r;
+reg signed [5:0] crt_vshift_r;
+reg signed [5:0] crt_vsize_r;
+reg              crt_vsmode_r;
+always @(posedge clk_vid) begin
+	crt_on_r     <= crt_on_emu;
+	crt_hsize_r  <= crt_hsize_emu;
+	crt_hpos_r   <= crt_hpos_emu;
+	crt_vshift_r <= crt_vshift_emu;
+	crt_vsize_r  <= crt_vsize_emu;
+	crt_vsmode_r <= crt_vsmode_emu;
+end
+
 // -- CRT V-Size + CRT Adjust (sys-side, SOLO ramo analogico) -----------------
 // Inseriti fra scanlines e vga_osd: l'HDMI pesca a MONTE (vga_*_sl), quindi
 // resta bit-identico mentre si regola il CRT. L'OSD viene composto sullo stream
@@ -1415,16 +1436,16 @@ crt_vsize #(
 ) u_crt_vsize (
 	.clk      (clk_vid),
 	.pxl_cen  (vga_ce_sl),
-	.active   (crt_on_emu),
-	.tube_mode(crt_vsmode_emu),
-	.vsize    (crt_vsize_emu),
+	.active   (crt_on_r),
+	.tube_mode(crt_vsmode_r),
+	.vsize    (crt_vsize_r),
 	.r_in     (vga_data_sl[23:16]),
 	.g_in     (vga_data_sl[15:8]),
 	.b_in     (vga_data_sl[7:0]),
 	.hs_in    (vga_hs_sl),
 	.vs_in    (vga_vs_sl),
 	.de_in    (vga_de_sl),
-	.vb_in    (crt_vbl_emu),          // VBlank VERO nativo dal core
+	.vb_in    (crt_vbl_emu),          // VBlank VERO: NON registrato, viaggia in fase con hs/vs
 	.r_out    (vga_data_vz[23:16]),
 	.g_out    (vga_data_vz[15:8]),
 	.b_out    (vga_data_vz[7:0]),
@@ -1443,7 +1464,7 @@ reg  crt_hs_ref_d;
 always @(posedge clk_vid) crt_hs_ref_d <= crt_hs_ref;
 wire crt_hs_ref_rise = crt_hs_ref & ~crt_hs_ref_d;
 
-wire [8:0] crt_rd_period = 9'd112 + {{4{crt_hsize_emu[4]}}, crt_hsize_emu};  // -16..+15 -> 96..127
+wire [8:0] crt_rd_period = 9'd112 + {{4{crt_hsize_r[4]}}, crt_hsize_r};  // -16..+15 -> 96..127
 reg  [8:0] crt_rd_acc;
 wire crt_rd_tick = (crt_rd_acc + 9'd8) >= crt_rd_period;
 always @(posedge clk_vid) begin
@@ -1451,7 +1472,7 @@ always @(posedge clk_vid) begin
 	else if (crt_rd_tick)     crt_rd_acc <= crt_rd_acc + 9'd8 - crt_rd_period;
 	else                      crt_rd_acc <= crt_rd_acc + 9'd8;
 end
-wire vga_ce_sl2 = crt_on_emu ? crt_rd_tick : vga_ce_vz;
+wire vga_ce_sl2 = crt_on_r ? crt_rd_tick : vga_ce_vz;
 
 wire [23:0] vga_data_hs;
 wire        vga_hs_hs, vga_vs_hs, vga_de_hs, vga_hb_hs, vga_vb_hs;
@@ -1463,10 +1484,10 @@ crt_adjust_sys #(
 	.clk      (clk_vid),
 	.pxl_cen  (vga_ce_vz),           // dal V-Size, non il CE nativo
 	.pxl2_cen (vga_ce_sl2),
-	.active   (crt_on_emu),
-	.hsize    (crt_hsize_emu),
-	.hoffset  (crt_hpos_emu),
-	.voffset  (crt_vshift_emu),
+	.active   (crt_on_r),
+	.hsize    (crt_hsize_r),
+	.hoffset  (crt_hpos_r),
+	.voffset  (crt_vshift_r),
 	.r_in     (vga_data_vz[23:16]),
 	.g_in     (vga_data_vz[15:8]),
 	.b_in     (vga_data_vz[7:0]),
